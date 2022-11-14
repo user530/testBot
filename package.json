@@ -1,0 +1,24 @@
+{
+  "name": "test_telegram_bot",
+  "version": "1.0.0",
+  "description": "test node-telegram-bot-api",
+  "main": "app.js",
+  "scripts": {
+    "test": "nodemon app.js"
+  },
+  "keywords": [
+    "node",
+    "telegram",
+    "bot"
+  ],
+  "author": "tmv",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.1.3",
+    "dotenv": "^16.0.3",
+    "node-telegram-bot-api": "^0.60.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.20"
+  }
+}
