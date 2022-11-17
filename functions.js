@@ -32,26 +32,10 @@ const wrapper = (cb) => {
   };
 };
 
-// Initial greeting
-const welcome = wrapper((userId, userMsg, userName, chatId) => {
-  bot.sendMessage(
-    chatId,
-    `Приветствую! Меня зовут Р.И.Н.А.Т.\nПокажу риск индикатор по любой недвижимости.Бесплатно. Это важно перед покупкой или продажей.\nНажми "Старт""`,
-    {
-      reply_markup: {
-        keyboard: [["Старт"]],
-        resize_keyboard: true,
-        one_time_keyboard: true,
-        force_reply: true,
-      },
-    }
-  );
-});
-
 // Request KN and add to the list
 const requestKn = wrapper((userId, userMsg, userName, chatId) => {
-  // No reaction for the chat messages
-  if (userId !== chatId) return;
+  // No reaction for the chat messages or If already requested
+  if (inWaitlist(userId) || userId !== chatId) return;
 
   // Send message
   bot.sendMessage(
@@ -76,7 +60,7 @@ const handleDM = async (userId, userMsg, userName, chatId) => {
   if (!inWaitlist(userId)) return;
 
   // Check the format
-  if (!userMsg.match(/^(\d{2}:\d{2}:\d{7}:\d{3})$/i)) {
+  if (!msgMatching(userMsg)) {
     // Signal wrong format and stop
     bot.sendMessage(
       chatId,
@@ -89,7 +73,7 @@ const handleDM = async (userId, userMsg, userName, chatId) => {
   bot.sendMessage(chatId, `Ищу данные, подождите 10-15 секунд...`);
 
   // Fetch data and report
-  getNReport(userMsg, userId, userName, chatId);
+  getNReport(userMsg, userId, userName, chatId, `IdPartner`);
 
   // Remove user from the wait list
   delWaitlist(userId);
@@ -98,7 +82,7 @@ const handleDM = async (userId, userMsg, userName, chatId) => {
 // Number request in global chat
 const handleChat = async (userId, userMsg, userName, chatId) => {
   // Check the format and ignore wrong one
-  if (!userMsg.match(/^(\d{2}:\d{2}:\d{7}:\d{3})$/i)) return;
+  if (!msgMatching(userMsg)) return;
 
   // Failure to open the chat will create error -> handle it
   try {
@@ -120,7 +104,7 @@ const handleChat = async (userId, userMsg, userName, chatId) => {
   );
 
   // Fetch data and report
-  getNReport(userMsg, userId, userName, chatId);
+  getNReport(userMsg, userId, userName, chatId, `IdPartner`);
 };
 
 // Send redirect link
@@ -132,11 +116,18 @@ const redirect = wrapper((userId, userMsg, userName, chatId) => {
   const kn = userMsg.split(` `).slice(-1)[0];
 
   // Create URL
-  const url = `http://pro.bezopasno.org/services/riskIndicator?kn=${kn}&utm_content=rinat,${userId},${chatId},${false}`;
+  const url = ``;
 
   // Send it
   bot.sendMessage(chatId, url);
 });
+
+// Check if message matching regex
+const msgMatching = (msg) => {
+  return (
+    typeof msg === `string` && msg.match(/^(\d{1,}:\d{1,}:\d{1,}:\d{1,})$/i)
+  );
+};
 
 // Check if ID in waitlist
 const inWaitlist = (userId) => {
@@ -196,11 +187,9 @@ const reportData = async (
   userId,
   userMsg,
   userName,
-  chatId
+  chatId,
+  idPartner
 ) => {
-  // Direct Message / Chat
-  const dm = userId === chatId;
-
   // Failed to get result
   if (!(msg && addr && rights && encumb))
     bot.sendMessage(
@@ -212,16 +201,16 @@ const reportData = async (
     // First msg
     await bot.sendMessage(
       chatId,
-      dm
+      userId === chatId
         ? `Отчёт по объекту: ${userMsg}`
         : `@${userName} Отчёт готов. Объект найден. Подробности в личных сообщениях: t.me/bs_rinat_bot`
     );
 
     // Second msg
-    await bot.sendMessage(
-      userId,
-      `${msg}!\nАдрес(а): ${addr[0]}.\nО правах: ${rights}\nОб ограничениях: ${encumb}`
-    );
+    await bot.sendMessage(userId, `${msg}!`);
+    await bot.sendMessage(userId, `Адрес: ${addr[0]}.`);
+    await bot.sendMessage(userId, `О правах: ${rights}`);
+    await bot.sendMessage(userId, `Об ограничениях: ${encumb}`);
 
     // Third msg
     await bot.sendMessage(
@@ -229,10 +218,16 @@ const reportData = async (
       `Детализированный отчёт с рекомендациями можно заказать по ссылке: https://pro.bezopasno.org/`,
       {
         reply_markup: {
-          keyboard: [[`Запросить подробный отчёт: ${userMsg}`]],
+          inline_keyboard: [
+            [
+              {
+                text: `Запросить подробный отчёт`,
+                url: `http://pro.bezopasno.org/services/riskIndicator?kn=${userMsg}&utm_content=rinat,${userId},${chatId},${idPartner}`,
+              },
+            ],
+          ],
           resize_keyboard: true,
           one_time_keyboard: true,
-          force_reply: true,
         },
       }
     );
@@ -240,23 +235,32 @@ const reportData = async (
 };
 
 // Get the data and report based on the chat
-const getNReport = async (userMsg, userId, chatId, idPartner) => {
+const getNReport = async (userMsg, userId, userName, chatId, idPartner) => {
   // Fetch the data
   const { msg, addr, rights, encumb } = await getData(
     userId,
     userMsg,
     chatId,
-    `???`
+    idPartner
   );
 
   // Report based on the data
-  reportData(msg, addr, rights, encumb, userId, userMsg, chatId, idPartner);
+  reportData(
+    msg,
+    addr,
+    rights,
+    encumb,
+    userId,
+    userMsg,
+    userName,
+    chatId,
+    idPartner
+  );
 };
 
 // Export
 module.exports = {
   bot,
-  welcome,
   requestKn,
   handleKn,
   redirect,
