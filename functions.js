@@ -65,6 +65,7 @@ const requestKn = wrapper((userId, userMsg, userName, chatId) => {
 
 // Handle request of the number
 const handleKn = wrapper(async (userId, userMsg, userName, chatId) => {
+  // Two routes for DM and Chat messages
   if (userId === chatId) handleDM(userId, userMsg, userName, chatId);
   else handleChat(userId, userMsg, userName, chatId);
 });
@@ -87,47 +88,8 @@ const handleDM = async (userId, userMsg, userName, chatId) => {
   // Signal start
   bot.sendMessage(chatId, `Ищу данные, подождите 10-15 секунд...`);
 
-  // Fetch the data
-  const { msg, addr, rights, encumb } = await getData(
-    userMsg,
-    userId,
-    chatId,
-    `???`
-  );
-
-  // Failed to get result
-  if (!(msg && addr && rights && encumb))
-    bot.sendMessage(
-      chatId,
-      `К сожалению, мы не нашли никакой информации по данному номеру. Попробуйте повторить попытку позднее или используйте другой номер.`
-    );
-  // Result aquired
-  else {
-    // First msg
-    await bot.sendMessage(chatId, `Отчёт по объекту: ${userMsg}`);
-
-    // Second msg
-    await bot.sendMessage(
-      userId,
-      `${msg}!\nАдрес(а): ${addr.join(
-        `;\n`
-      )}.\nО правах: ${rights}\nОб ограничениях: ${encumb}`
-    );
-
-    // Third msg
-    await bot.sendMessage(
-      userId,
-      `Детализированный отчёт с рекомендациями можно заказать по ссылке: https://pro.bezopasno.org/`,
-      {
-        reply_markup: {
-          keyboard: [[`Запросить подробный отчёт: ${userMsg}`]],
-          resize_keyboard: true,
-          one_time_keyboard: true,
-          force_reply: true,
-        },
-      }
-    );
-  }
+  // Fetch data and report
+  getNReport(userMsg, userId, userName, chatId);
 
   // Remove user from the wait list
   delWaitlist(userId);
@@ -135,25 +97,13 @@ const handleDM = async (userId, userMsg, userName, chatId) => {
 
 // Number request in global chat
 const handleChat = async (userId, userMsg, userName, chatId) => {
-  // Check the format
-  if (!userMsg.match(/^(\d{2}:\d{2}:\d{7}:\d{3})$/i)) {
-    // Signal wrong format and stop
-    bot.sendMessage(
-      chatId,
-      `Уточните формат кадастрового номера! Верный формат 47:14:1203001:814.\nПопробуйте еще раз. Спасибо.`
-    );
-    return;
-  }
+  // Check the format and ignore wrong one
+  if (!userMsg.match(/^(\d{2}:\d{2}:\d{7}:\d{3})$/i)) return;
 
+  // Failure to open the chat will create error -> handle it
   try {
-    await bot
-      // Check that direct chat is opened
-      .sendMessage(userId, `@${userName}, ваш запрос обрабатывается.`);
-    // Signal start
-    bot.sendMessage(
-      chatId,
-      `@${userName} Запрос принял! Выполняю...\nОжидание 10-15 секунд`
-    );
+    // Check that direct chat is opened
+    await bot.sendMessage(userId, `@${userName}, ваш запрос обрабатывается.`);
   } catch (err) {
     // Warn and stop
     bot.sendMessage(
@@ -163,49 +113,14 @@ const handleChat = async (userId, userMsg, userName, chatId) => {
     return;
   }
 
-  // Fetch the data
-  const { msg, addr, rights, encumb } = await getData(
-    userMsg,
-    userId,
+  // Signal start
+  bot.sendMessage(
     chatId,
-    `???`
+    `@${userName} Запрос принял! Выполняю...\nОжидание 10-15 секунд`
   );
 
-  // Failed to get result
-  if (!(msg && addr && rights && encumb))
-    bot.sendMessage(
-      chatId,
-      `К сожалению, мы не нашли никакой информации по данному номеру. Попробуйте повторить попытку позднее или используйте другой номер.`
-    );
-  // Result aquired
-  else {
-    // First msg
-    await bot.sendMessage(
-      chatId,
-      `@${userName} Отчёт готов. Объект найден. Подробности в личных сообщениях: t.me/bs_rinat_bot`
-    );
-
-    // Second msg
-    await bot.sendMessage(
-      userId,
-      `${msg}!\nАдрес(а): ${addr.join(
-        `;\n`
-      )}.\nО правах: ${rights}\nОб ограничениях: ${encumb}`
-    );
-    // Third msg
-    await bot.sendMessage(
-      userId,
-      `Детализированный отчёт с рекомендациями можно заказать по ссылке: https://pro.bezopasno.org/`,
-      {
-        reply_markup: {
-          keyboard: [[`Запросить подробный отчёт: ${userMsg}`]],
-          resize_keyboard: true,
-          one_time_keyboard: true,
-          force_reply: true,
-        },
-      }
-    );
-  }
+  // Fetch data and report
+  getNReport(userMsg, userId, userName, chatId);
 };
 
 // Send redirect link
@@ -239,7 +154,7 @@ const delWaitlist = (userId) => {
 };
 
 // Get the data from the number
-const getData = async (userMsg, userId, chatId, idPartner) => {
+const getData = async (userId, userMsg, chatId, idPartner) => {
   // Prepare the result variable
   const res = {};
 
@@ -272,6 +187,73 @@ const getData = async (userMsg, userId, chatId, idPartner) => {
   }
 };
 
+// Check data and send messages based on the chat
+const reportData = async (
+  msg,
+  addr,
+  rights,
+  encumb,
+  userId,
+  userMsg,
+  userName,
+  chatId
+) => {
+  // Direct Message / Chat
+  const dm = userId === chatId;
+
+  // Failed to get result
+  if (!(msg && addr && rights && encumb))
+    bot.sendMessage(
+      userId,
+      `К сожалению, мы не нашли никакой информации по данному номеру. Попробуйте повторить попытку позднее или используйте другой номер.`
+    );
+  // Result aquired
+  else {
+    // First msg
+    await bot.sendMessage(
+      chatId,
+      dm
+        ? `Отчёт по объекту: ${userMsg}`
+        : `@${userName} Отчёт готов. Объект найден. Подробности в личных сообщениях: t.me/bs_rinat_bot`
+    );
+
+    // Second msg
+    await bot.sendMessage(
+      userId,
+      `${msg}!\nАдрес(а): ${addr[0]}.\nО правах: ${rights}\nОб ограничениях: ${encumb}`
+    );
+
+    // Third msg
+    await bot.sendMessage(
+      userId,
+      `Детализированный отчёт с рекомендациями можно заказать по ссылке: https://pro.bezopasno.org/`,
+      {
+        reply_markup: {
+          keyboard: [[`Запросить подробный отчёт: ${userMsg}`]],
+          resize_keyboard: true,
+          one_time_keyboard: true,
+          force_reply: true,
+        },
+      }
+    );
+  }
+};
+
+// Get the data and report based on the chat
+const getNReport = async (userMsg, userId, chatId, idPartner) => {
+  // Fetch the data
+  const { msg, addr, rights, encumb } = await getData(
+    userId,
+    userMsg,
+    chatId,
+    `???`
+  );
+
+  // Report based on the data
+  reportData(msg, addr, rights, encumb, userId, userMsg, chatId, idPartner);
+};
+
+// Export
 module.exports = {
   bot,
   welcome,
