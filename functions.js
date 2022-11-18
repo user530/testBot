@@ -10,9 +10,6 @@ const TelegramBot = require(`node-telegram-bot-api`);
 // Telegram bot instance
 const bot = new TelegramBot(apiToken, { polling: true });
 
-// Prepare variable to keep track of users awaiting answer
-bot.waitingUsers = [];
-
 // Load and set default options
 const axios = require(`axios`);
 axios.default;
