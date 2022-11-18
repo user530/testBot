@@ -32,19 +32,18 @@ const wrapper = (cb) => {
   };
 };
 
+// ===================== MAIN FUNCTIONS
+
 // Request KN and add to the list
 const requestKn = wrapper((userId, userMsg, userName, chatId) => {
-  // No reaction for the chat messages or If already requested
-  if (inWaitlist(userId) || userId !== chatId) return;
+  // No reaction for the chat messages
+  if (userId !== chatId) return;
 
   // Send message
   bot.sendMessage(
     chatId,
     `Пришлите мне кадастровый номер объекта недвижимости в формате 47:14:1203001:814\nВ ответ напишу, что там было интересного в истории`
   );
-
-  // Add user to the waiting list if he's not there
-  if (!inWaitlist(userId)) addWaitlist(userId);
 });
 
 // Handle request of the number
@@ -54,11 +53,10 @@ const handleKn = wrapper(async (userId, userMsg, userName, chatId) => {
   else handleChat(userId, userMsg, userName, chatId);
 });
 
+// =================== HELPER FUNCTIONS
+
 // Number request in DM chat
 const handleDM = async (userId, userMsg, userName, chatId) => {
-  // User is not in the wait list -> ignore
-  if (!inWaitlist(userId)) return;
-
   // Check the format
   if (!msgMatching(userMsg)) {
     // Signal wrong format and stop
@@ -74,9 +72,6 @@ const handleDM = async (userId, userMsg, userName, chatId) => {
 
   // Fetch data and report
   getNReport(userMsg, userId, userName, chatId, `IdPartner`);
-
-  // Remove user from the wait list
-  delWaitlist(userId);
 };
 
 // Number request in global chat
@@ -107,41 +102,11 @@ const handleChat = async (userId, userMsg, userName, chatId) => {
   getNReport(userMsg, userId, userName, chatId, `IdPartner`);
 };
 
-// Send redirect link
-const redirect = wrapper((userId, userMsg, userName, chatId) => {
-  // Only in DM
-  if (userId !== chatId) return;
-
-  // Get number
-  const kn = userMsg.split(` `).slice(-1)[0];
-
-  // Create URL
-  const url = ``;
-
-  // Send it
-  bot.sendMessage(chatId, url);
-});
-
 // Check if message matching regex
 const msgMatching = (msg) => {
   return (
     typeof msg === `string` && msg.match(/^(\d{1,}:\d{1,}:\d{1,}:\d{1,})$/i)
   );
-};
-
-// Check if ID in waitlist
-const inWaitlist = (userId) => {
-  return bot.waitingUsers.find((id) => id === userId);
-};
-
-// Add ID to waitlist
-const addWaitlist = (userId) => {
-  if (bot.waitingUsers.indexOf(userId) === -1) bot.waitingUsers.push(userId);
-};
-
-// Delete ID from waitlist
-const delWaitlist = (userId) => {
-  bot.waitingUsers.splice(bot.waitingUsers.indexOf(userId), 1);
 };
 
 // Get the data from the number
@@ -222,7 +187,7 @@ const reportData = async (
             [
               {
                 text: `Запросить подробный отчёт`,
-                url: `http://pro.bezopasno.org/services/riskIndicator?kn=${userMsg}&utm_content=rinat,${userId},${chatId},${idPartner}`,
+                url: `http://pro.bezopasno.org/`,
               },
             ],
           ],
@@ -263,5 +228,4 @@ module.exports = {
   bot,
   requestKn,
   handleKn,
-  redirect,
 };
