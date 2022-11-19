@@ -184,7 +184,7 @@ const reportData = async (
             [
               {
                 text: `Запросить подробный отчёт`,
-                url: `http://pro.bezopasno.org/`,
+                url: `http://pro.bezopasno.org/?kn=${userMsg}&utm_content=rinat,${userId},${chatId},${idPartner}`,
               },
             ],
           ],
